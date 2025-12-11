@@ -7,7 +7,7 @@
 namespace Vulkan
 {
 
-static std::unique_ptr<vk::DynamicLoader> dl;
+static std::unique_ptr<vk::detail::DynamicLoader> dl;
 
 Context::Context()
 {
@@ -33,7 +33,7 @@ static bool load_loader()
     if (dl)
         return true;
 
-    dl = std::make_unique<vk::DynamicLoader>();
+    dl = std::make_unique<vk::detail::DynamicLoader>();
     if (!dl->success())
     {
         dl.reset();
@@ -123,6 +123,7 @@ bool Context::init_Xlib()
     if (!instance)
         return false;
 
+    platform_name = "xlib";
     return init();
 }
 
@@ -144,6 +145,7 @@ bool Context::init_wayland()
     if (!instance)
         return false;
 
+    platform_name = "wayland";
     return init();
 }
 
@@ -233,6 +235,12 @@ bool Context::init_device()
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
     };
 
+    std::vector<const char *> present_wait_extensions =
+    {
+        VK_KHR_PRESENT_ID_EXTENSION_NAME,
+        VK_KHR_PRESENT_WAIT_EXTENSION_NAME
+    };
+
     auto device_list = instance->enumeratePhysicalDevices().value;
     bool device_chosen = false;
     physical_device = vk::PhysicalDevice();
@@ -261,6 +269,17 @@ bool Context::init_device()
     if (!device_chosen)
         return false;
 
+    if (check_extensions(present_wait_extensions, physical_device))
+    {
+        for (auto &ext : present_wait_extensions)
+            required_extensions.push_back(ext);
+        have_present_wait = true;
+    }
+    else
+    {
+        have_present_wait = false;
+    }
+
     if (auto index = find_graphics_queue(physical_device))
         graphics_queue_family_index = *index;
     else
@@ -269,6 +288,14 @@ bool Context::init_device()
     std::vector<float> priorities = { 1.0f };
     vk::DeviceQueueCreateInfo dqci({}, graphics_queue_family_index, priorities);
     vk::DeviceCreateInfo dci({}, dqci, {}, required_extensions);
+
+    vk::PhysicalDevicePresentWaitFeaturesKHR physical_device_present_wait_feature(true);
+    vk::PhysicalDevicePresentIdFeaturesKHR physical_device_present_id_feature(true);
+    if (have_present_wait)
+    {
+        dci.setPNext(&physical_device_present_wait_feature);
+        physical_device_present_wait_feature.setPNext(&physical_device_present_id_feature);
+    }
 
     device = physical_device.createDevice(dci).value;
     queue = device.getQueue(graphics_queue_family_index, 0);

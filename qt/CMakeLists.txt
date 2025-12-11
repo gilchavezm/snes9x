@@ -154,8 +154,13 @@ else()
     ../external/glad/src/egl.c)
 endif()
 
-find_package(SDL3 QUIET)
-if (SDL3_FOUND AND (NOT ${CMAKE_SYSTEM_NAME} STREQUAL "Windows"))
+set(USE_SYSTEM_SDL3 CACHE BOOL OFF)
+
+if (USE_SYSTEM_SDL3)
+    find_package(SDL3 QUIET)
+endif()
+
+if (SDL3_FOUND)
     message("Using system SDL3.")
     list(APPEND LIBS SDL3::SDL3)
     list(APPEND INCLUDES ${SDL3_INCLUDE_DIRS})
@@ -164,7 +169,7 @@ else()
     FetchContent_Declare(
         SDL3
         GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
-        GIT_TAG 313d522f39c5b6aa9fa3498d41c75c7d560250da
+        GIT_TAG release-3.2.20
         GIT_SHALLOW TRUE
         GIT_PROGRESS TRUE
         EXCLUDE_FROM_ALL
@@ -184,7 +189,7 @@ endif()
 list(APPEND DEFINES SDL_MAIN_HANDLED)
 
 list(APPEND PLATFORM_SOURCES ../external/fmt/src/format.cc)
-list(APPEND INCLUDES ../external/fmt/include)
+list(PREPEND INCLUDES ../external/fmt/include)
 
 list(APPEND QT_GUI_SOURCES
     src/main.cpp
@@ -243,11 +248,10 @@ list(APPEND LIBS cubeb)
 list(APPEND INCLUDES "../external/cubeb/include")
 
 set(BUILD_TESTING CACHE BOOL OFF)
+set(ENABLE_OPT 0)
 add_subdirectory("../external/glslang" "glslang" EXCLUDE_FROM_ALL)
 list(APPEND LIBS
     glslang
-    OGLCompiler
-    HLSL
     OSDependent
     SPIRV
     glslang-default-resource-limits)

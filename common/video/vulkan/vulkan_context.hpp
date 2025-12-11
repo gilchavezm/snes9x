@@ -55,6 +55,8 @@ class Context
     vk::PhysicalDevice physical_device;
     vk::PhysicalDeviceProperties physical_device_props;
     vk::UniqueSurfaceKHR surface;
+    std::string platform_name;
+    bool have_present_wait;
 
   private:
     bool init_vma();

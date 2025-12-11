@@ -4,8 +4,9 @@
    For further information, consult the LICENSE file in the root directory.
 \*****************************************************************************/
 
-#pragma once
-#include "gtk_compat.h"
+#ifndef _sharpbilinear_flexible_h_
+#define _sharpbilinear_flexible_h_
 
-bool gtk_shader_parameters_dialog(GtkWindow *parent);
-void gtk_shader_parameters_dialog_close();
+void sharpbilinear_4x(uint8_t* srcPtr, int srcPitch, uint8_t* dstPtr, int dstPitch, int srcWidth, int srcHeight);
+
+#endif

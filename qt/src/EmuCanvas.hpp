@@ -9,7 +9,6 @@ class EmuCanvas : public QWidget
 {
   public:
     EmuCanvas(EmuConfig *config, QWidget *main_window);
-    ~EmuCanvas();
 
     virtual void deinit() = 0;
     virtual void draw() = 0;
@@ -18,6 +17,7 @@ class EmuCanvas : public QWidget
     virtual void recreateUIAssets() {}
     void output(uint8_t *buffer, int width, int height, QImage::Format format, int bytes_per_line, double frame_rate);
     void throttle();
+    double get_late_frames();
     void resizeEvent(QResizeEvent *event) override = 0;
 
     virtual std::vector<std::string> getDeviceList()

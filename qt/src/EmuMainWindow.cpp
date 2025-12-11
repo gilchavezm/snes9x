@@ -2,26 +2,24 @@
 #include <QMenu>
 #include <QMenuBar>
 #include <QFileDialog>
-#include <QtWidgets>
 #include <QtEvents>
 #include <QGuiApplication>
-#include <QStackedWidget>
-#include <qguiapplication.h>
 #include <qnamespace.h>
-#include <qpa/qplatformnativeinterface.h>
 
 #ifdef Q_OS_WIN
 #include <dwmapi.h>
 #endif
 
-#include "EmuMainWindow.hpp"
-#include "EmuSettingsWindow.hpp"
+#include "CheatsDialog.hpp"
 #include "EmuApplication.hpp"
 #include "EmuBinding.hpp"
-#include "EmuCanvasVulkan.hpp"
 #include "EmuCanvasOpenGL.hpp"
 #include "EmuCanvasQt.hpp"
-#include "CheatsDialog.hpp"
+#include "EmuCanvasVulkan.hpp"
+#include "EmuMainWindow.hpp"
+#include "EmuSettingsWindow.hpp"
+
+#include <QMessageBox>
 #undef KeyPress
 
 static EmuSettingsWindow *g_emu_settings_window = nullptr;
@@ -30,7 +28,7 @@ class DefaultBackground
     : public QWidget
 {
 public:
-    DefaultBackground(QWidget *parent)
+    explicit DefaultBackground(QWidget *parent)
         : QWidget(parent)
     {
     }
@@ -67,9 +65,7 @@ EmuMainWindow::EmuMainWindow(EmuApplication *app)
     });
 }
 
-EmuMainWindow::~EmuMainWindow()
-{
-}
+EmuMainWindow::~EmuMainWindow() = default;
 
 void EmuMainWindow::destroyCanvas()
 {
@@ -80,8 +76,7 @@ void EmuMainWindow::destroyCanvas()
     if (using_stacked_widget)
     {
         auto stackwidget = (QStackedWidget *)central_widget;
-        EmuCanvas *widget = (EmuCanvas *)stackwidget->widget(0);
-        if (widget)
+        if (auto widget = (EmuCanvas *)stackwidget->widget(0))
         {
             widget->deinit();
             stackwidget->removeWidget(widget);
@@ -91,7 +86,7 @@ void EmuMainWindow::destroyCanvas()
     }
     else
     {
-        EmuCanvas *widget = (EmuCanvas *)takeCentralWidget();
+        auto widget = (EmuCanvas *)takeCentralWidget();
         widget->deinit();
         delete widget;
     }
@@ -160,7 +155,10 @@ void EmuMainWindow::setCoreActionsEnabled(bool enable)
 void EmuMainWindow::createWidgets()
 {
     setWindowTitle("Snes9x");
-    setWindowIcon(QIcon(":/icons/snes9x.svg"));
+    if (QIcon::hasThemeIcon("snes9x"))
+        setWindowIcon(QIcon::fromTheme("snes9x"));
+    else
+        setWindowIcon(QIcon(":/icons/snes9x.svg"));
 
 #ifdef Q_OS_WIN
     HWND hwnd = reinterpret_cast<HWND>(winId());
@@ -174,7 +172,7 @@ void EmuMainWindow::createWidgets()
     // File menu
     auto file_menu = new QMenu(tr("&File"));
     auto open_item = file_menu->addAction(QIcon(iconset + "open.svg"), tr("&Open File..."));
-    open_item->connect(open_item, &QAction::triggered, this, [&] {
+    connect(open_item, &QAction::triggered, this, [&] {
         openFile();
     });
     // File->Recent Files submenu
@@ -229,7 +227,7 @@ void EmuMainWindow::createWidgets()
     file_menu->addMenu(save_state_menu);
 
     auto exit_item = new QAction(QIcon(iconset + "exit.svg"), tr("E&xit"));
-    exit_item->connect(exit_item, &QAction::triggered, this, [&](bool checked) {
+    connect(exit_item, &QAction::triggered, this, [&](bool checked) {
         close();
     });
 
@@ -304,7 +302,7 @@ void EmuMainWindow::createWidgets()
     {
         auto string = (i == 10) ? tr("1&0x") : tr("&%1x").arg(i);
         auto item = set_size_menu->addAction(string);
-        item->connect(item, &QAction::triggered, this, [&, i](bool checked) {
+        connect(item, &QAction::triggered, this, [&, i](bool checked) {
             resizeToMultiple(i);
         });
     }
@@ -314,7 +312,7 @@ void EmuMainWindow::createWidgets()
 
     auto fullscreen_item = new QAction(QIcon(iconset + "fullscreen.svg"), tr("&Fullscreen"));
     view_menu->addAction(fullscreen_item);
-    fullscreen_item->connect(fullscreen_item, &QAction::triggered, [&](bool checked) {
+    connect(fullscreen_item, &QAction::triggered, [&](bool checked) {
         toggleFullscreen();
     });
 
@@ -379,10 +377,9 @@ void EmuMainWindow::setBypassCompositor(bool bypass)
 #ifndef _WIN32
     if (QGuiApplication::platformName() == "xcb")
     {
-        auto pni = QGuiApplication::platformNativeInterface();
-
         uint32_t value = bypass;
-        auto display = (Display *)pni->nativeResourceForWindow("display", windowHandle());
+        auto iface = app->qtapp->nativeInterface<QNativeInterface::QX11Application>();
+        auto display = iface->display();
         auto xid = winId();
         Atom net_wm_bypass_compositor = XInternAtom(display, "_NET_WM_BYPASS_COMPOSITOR", False);
         XChangeProperty(display, xid, net_wm_bypass_compositor, 6, 32, PropModeReplace, (unsigned char *)&value, 1);
@@ -444,12 +441,12 @@ void EmuMainWindow::openFile()
     app->unpause();
 }
 
-bool EmuMainWindow::openFile(std::string filename)
+bool EmuMainWindow::openFile(const std::string &filename)
 {
     if (app->openFile(filename))
     {
         auto &ru = app->config->recently_used;
-        auto it = std::find(ru.begin(), ru.end(), filename);
+        auto it = std::ranges::find(ru, filename);
         if (it != ru.end())
             ru.erase(it);
         ru.insert(ru.begin(), filename);

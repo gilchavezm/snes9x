@@ -4,18 +4,11 @@
 #include <qwidget.h>
 
 EmuCanvas::EmuCanvas(EmuConfig *config, QWidget *main_window)
-    : config(config), main_window(main_window)
+    : output_data{}, main_window(main_window), config(config)
 {
     setFocus();
     setFocusPolicy(Qt::StrongFocus);
     setMouseTracking(true);
-
-    output_data.buffer = nullptr;
-    output_data.ready = false;
-}
-
-EmuCanvas::~EmuCanvas()
-{
 }
 
 void EmuCanvas::output(uint8_t *buffer, int width, int height, QImage::Format format, int bytes_per_line, double frame_rate)
@@ -27,7 +20,26 @@ void EmuCanvas::output(uint8_t *buffer, int width, int height, QImage::Format fo
     output_data.bytes_per_line = bytes_per_line;
     output_data.frame_rate = frame_rate;
     output_data.ready = true;
+
+    if (get_late_frames() >= 1.0)
+    {
+        throttle_object.advance();
+        if (get_late_frames() >= 1.0)
+            throttle_object.reset();
+        return;
+    }
+
     draw();
+}
+
+double EmuCanvas::get_late_frames()
+{
+    if (config->speed_sync_method != EmuConfig::eTimerWithFrameskip)
+        return 0.0;
+
+    throttle_object.set_frame_rate(config->fixed_frame_rate == 0.0 ? output_data.frame_rate : config->fixed_frame_rate);
+
+    return throttle_object.get_late_frames();
 }
 
 void EmuCanvas::throttle()
@@ -43,10 +55,10 @@ QRect EmuCanvas::applyAspect(const QRect &viewport)
 {
     if (!config->scale_image)
     {
-        return QRect((viewport.width() - output_data.width) / 2,
-                     (viewport.height() - output_data.height) / 2,
-                     output_data.width,
-                     output_data.height);
+        return { (viewport.width() - output_data.width) / 2,
+                 (viewport.height() - output_data.height) / 2,
+                 output_data.width,
+                 output_data.height };
     }
     if (!config->maintain_aspect_ratio)
         return viewport;
@@ -75,10 +87,10 @@ QRect EmuCanvas::applyAspect(const QRect &viewport)
 
         int new_height = output_data.height * max_scale;
         int new_width = new_height * num / den;
-        return QRect((viewport.width() - new_width) / 2,
-                     (viewport.height() - new_height) / 2,
-                     new_width,
-                     new_height);
+        return { (viewport.width() - new_width) / 2,
+                 (viewport.height() - new_height) / 2,
+                 new_width,
+                 new_height };
     }
 
     double canvas_aspect = (double)viewport.width() / viewport.height();

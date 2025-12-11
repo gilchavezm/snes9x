@@ -33,10 +33,6 @@ S9xVulkanDisplayDriver::S9xVulkanDisplayDriver(Snes9xWindow *_window, Snes9xConf
     context.reset();
 }
 
-S9xVulkanDisplayDriver::~S9xVulkanDisplayDriver()
-{
-}
-
 bool S9xVulkanDisplayDriver::init_imgui()
 {
     auto defaults = S9xImGuiGetDefaults();
@@ -238,7 +234,10 @@ void S9xVulkanDisplayDriver::update(uint16_t *buffer, int width, int height, int
         context->swapchain->swap();
 
         if (gui_config->reduce_input_lag)
+        {
             context->wait_idle();
+            context->swapchain->present_wait();
+        }
     }
 }
 
@@ -254,7 +253,7 @@ void *S9xVulkanDisplayDriver::get_parameters()
     return nullptr;
 }
 
-void S9xVulkanDisplayDriver::save(const char *filename)
+void S9xVulkanDisplayDriver::save(const std::string &filename)
 {
     setlocale(LC_NUMERIC, "C");
     if (shaderchain)
